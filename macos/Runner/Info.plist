@@ -26,6 +26,8 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mute Around needs your microphone to remove background noise from your voice. Audio is processed on this computer and never stored or sent anywhere.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

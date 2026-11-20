@@ -144,7 +144,9 @@ Windows v1 outputs to VB-CABLE; no kernel driver.
   (wrap them with `NativeFinalizer` as a safety net).
 - **Audio thread rules (non-negotiable):** no allocation, no locks, no I/O, no
   logging, no calls into Dart. Use lock-free SPSC ring buffers / atomics to
-  talk to the UI.
+  talk to the UI. "No allocation" means no system-heap allocation: libDF's
+  per-frame allocations are served from a preallocated pool
+  (`native/engine/dfshim/src/rt_alloc.rs`), checked by `test_no_alloc`.
 - Latency budget: ≤ 50 ms end to end. Mention latency/CPU impact of any DSP change.
 - C/C++ formatted with `.clang-format`.
 

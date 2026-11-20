@@ -1,6 +1,15 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:mute_around/mute_around.dart';
+import 'package:mute_around/app/app.dart';
+import 'package:mute_around/app/di.dart';
 
-void main() {
-  runApp(const MuteAround());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await configureDependencies();
+  runApp(
+    MuteAround(
+      createPipelineBloc: getIt.call,
+      stopPipeline: getIt(),
+      hostInfo: getIt(),
+    ),
+  );
 }

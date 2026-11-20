@@ -1,0 +1,6 @@
+[submodule "native/engine/third_party/deepfilternet"]
+	path = native/engine/third_party/deepfilternet
+	url = https://github.com/Rikorose/DeepFilterNet.git
+[submodule "native/macos_hal/third_party/libASPL"]
+	path = native/macos_hal/third_party/libASPL
+	url = https://github.com/gavv/libASPL.git
