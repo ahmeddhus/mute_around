@@ -1,0 +1,26 @@
+# build_runner configuration.
+# Run: dart run build_runner build -d   (or `watch -d` while developing)
+#
+# Generators are scoped to the files that use them to keep builds fast.
+
+targets:
+  $default:
+    builders:
+      freezed:
+        generate_for:
+          - lib/**
+      json_serializable:
+        generate_for:
+          - lib/**
+        options:
+          explicit_to_json: true
+          include_if_null: false
+      go_router_builder:
+        generate_for:
+          - lib/app/router.dart
+      injectable_generator:injectable_builder:
+        generate_for:
+          - lib/**
+      injectable_generator:injectable_config_builder:
+        generate_for:
+          - lib/app/di.dart

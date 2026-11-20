@@ -30,12 +30,17 @@ analyzer:
     cancel_subscriptions: error
     # TODOs are allowed while developing.
     todo: ignore
+    # Needed for freezed/json_serializable field annotations.
+    invalid_annotation_target: ignore
   exclude:
     - build/**
     - windows/**
     - macos/**
     - '**/*.g.dart'
     - '**/*.freezed.dart'
+    - '**/*.config.dart'
+    - '**/*.module.dart'
+    - '**/*.ffigen.dart'
 
 linter:
   rules:

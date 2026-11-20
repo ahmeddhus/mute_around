@@ -49,3 +49,10 @@ app.*.map.json
 
 # Claude Code local (per-user) settings
 .claude/settings.local.json
+
+# Code generation output (run: dart run build_runner build -d)
+*.g.dart
+*.freezed.dart
+*.config.dart
+*.module.dart
+*.injectable.json
