@@ -151,7 +151,8 @@ Windows v1 outputs to VB-CABLE; no kernel driver.
 ### Privacy & licensing
 - No network calls, telemetry, analytics or accounts. Ever.
 - Never write audio to disk unless the user explicitly asks.
-- Only MIT/BSD/Apache-2.0/zlib dependencies. Check the license before adding
+- Only MIT/MIT-0/BSD/Apache-2.0/zlib/ISC/Unicode-3.0 (or public-domain)
+  dependencies. Check the license before adding
   any package or native library. Native libraries and model files must be
   recorded in `THIRD_PARTY_NOTICES.md` and registered with
   `LicenseRegistry.addLicense`; Dart packages are covered automatically.
