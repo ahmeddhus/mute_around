@@ -2,6 +2,7 @@ name: mute_around
 description: "Cancel background noise and improve your voice in real time on macOS and Windows."
 
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
