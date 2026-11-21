@@ -53,6 +53,11 @@ add_library(mute_engine_core STATIC
   src/engine.c
   src/devices.c
   src/processing.c
+  src/agc.c
+  src/limiter.c
+  src/crossfade.c
+  src/overload.c
+  src/levels.c
   src/drift.c
   src/ring_buffer.c
   src/rt_thread.c

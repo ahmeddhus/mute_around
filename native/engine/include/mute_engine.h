@@ -177,19 +177,35 @@ ME_API me_result me_engine_switch_input(me_engine* engine, const char* capture_i
 /** Stops devices and the processing thread. Returns ME_ERR_STATE when not running. */
 ME_API me_result me_engine_stop(me_engine* engine);
 
-/** User bypass (pass raw audio). Atomic store; valid in any state after create. */
+/**
+ * User bypass (pass raw audio). Crossfades over 10 ms. Atomic store; valid
+ * in any state after create.
+ */
 ME_API void me_set_bypass(me_engine* engine, uint8_t on);
 
-/** Automatic gain control on/off. Atomic store; valid in any state after create. */
+/**
+ * Automatic gain control on/off (speech-gated, target -18 dBFS; the -1 dBFS
+ * limiter stays on). Atomic store; valid in any state after create.
+ */
 ME_API void me_set_agc(me_engine* engine, uint8_t on);
 
-/** Suppression strength, applied at the next frame. Valid in any state after create. */
+/**
+ * Suppression strength (max attenuation 12 / 24 / 100 dB), applied at the
+ * next frame. Valid in any state after create.
+ */
 ME_API void me_set_strength(me_engine* engine, me_strength strength);
 
-/** Current status. Wait-free. Returns ME_STATUS_ERROR for a NULL engine. */
+/**
+ * Current status. Wait-free. While running, the user's bypass is reported
+ * before an automatic (overload) one. Returns ME_STATUS_ERROR for a NULL
+ * engine.
+ */
 ME_API me_status me_get_status(me_engine* engine);
 
-/** Current levels. Wait-free. */
+/**
+ * Current input (raw) and output levels in dBFS, -90..0: peak with a 300 ms
+ * fall, RMS over ~50 ms. Silence when stopped or no audio arrives. Wait-free.
+ */
 ME_API void me_get_levels(me_engine* engine, me_levels* out);
 
 /** Diagnostics counters. Wait-free. */

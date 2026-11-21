@@ -8,10 +8,15 @@
 #include <stdatomic.h>
 #include <stddef.h>
 
+#include "agc.h"
+#include "crossfade.h"
 #include "drift.h"
+#include "levels.h"
+#include "limiter.h"
 #include "miniaudio_config.h"
 #include "mute_df.h"
 #include "mute_engine.h"
+#include "overload.h"
 #include "ring_buffer.h"
 #include "rt_thread.h"
 
@@ -31,6 +36,12 @@
 /* DFN3 low-latency model: STFT window minus hop, no lookahead. */
 #define ME_DFN_DELAY_MS 10.0f
 #define ME_ERROR_MAX 512
+/* Hop period in milliseconds. */
+#define ME_HOP_MS (1000.0f * ME_HOP / ME_SAMPLE_RATE)
+/* With this much input waiting, an output underrun means we fell behind. */
+#define ME_BACKLOG_FRAMES (2 * ME_HOP)
+/* No hop for this long: the meters show silence. */
+#define ME_LEVELS_IDLE_US 100000
 
 struct me_engine {
     /* Owned by the control thread. */
@@ -57,6 +68,7 @@ struct me_engine {
     _Atomic int proc_run;         /* processing thread keeps looping while set */
     _Atomic int capture_stopping; /* set while we stop the capture device ourselves */
     _Atomic int playback_primed;
+    _Atomic int overloaded; /* mirror of `overload.active` for me_get_status */
 
     /* Audio path. */
     me_ring ring_in;
@@ -65,6 +77,18 @@ struct me_engine {
     /* Processing-thread scratch: one hop plus room for a duplicated sample. */
     float in_hop[ME_HOP];
     float out_hop[ME_HOP + 1];
+
+    /* DSP after DFN; processing thread only (or the offline test path).
+     * See me_process_hop for the order. */
+    float proc_hop[ME_HOP];  /* DFN (+ AGC) output */
+    float raw_delay[ME_HOP]; /* previous input hop: raw audio aligned with DFN's delay */
+    int applied_strength;    /* strength last given to DFN; -1 forces an update */
+    me_agc agc_state;
+    me_limiter limiter;
+    me_crossfade xfade;
+    me_overload overload;
+    uint32_t seen_underruns;
+    me_levels_state levels; /* written here, read by me_get_levels */
 
     /* Stats (atomics; floats stored as their bit patterns). */
     _Atomic uint32_t frames_processed;
@@ -100,9 +124,19 @@ me_result me_find_device(me_engine* engine, ma_device_type type, const char* id,
 void me_processing_main(void* engine);
 
 /*
- * Processes one hop of ME_HOP samples: DFN, then (later stories) AGC,
- * limiter and bypass crossfade. Real-time safe once the thread has entered
- * the DFN pool (me_internal_rt_enter).
+ * Resets the per-hop DSP state (AGC, limiter, crossfade, overload, meters)
+ * for a fresh start. Control thread, while the processing thread isn't
+ * running.
+ */
+void me_processing_reset(me_engine* engine);
+
+/* Maximum noise attenuation for a strength preset, in dB. */
+float me_strength_attenuation_db(int32_t strength);
+
+/*
+ * Processes one hop of ME_HOP samples: DFN → AGC → bypass crossfade →
+ * limiter → meters. Real-time safe once the thread has entered the DFN pool
+ * (me_internal_rt_enter).
  */
 void me_process_hop(me_engine* engine, const float* in, float* out);
 
@@ -114,6 +148,9 @@ void me_internal_rt_leave(void);
 
 /* System-heap fallbacks of the DFN pool (should stay 0). */
 size_t me_internal_rt_fallbacks(void);
+
+/* Current AGC gain in dB (offline tests). */
+float me_internal_agc_gain_db(const me_engine* engine);
 
 /*
  * Processes `frames` samples from `in` to `out` on the calling thread, in

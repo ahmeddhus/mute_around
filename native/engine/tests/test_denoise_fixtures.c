@@ -4,6 +4,9 @@
  * Runs each fixture through the engine's offline processing path at Medium
  * and measures the noise floor over the fixture's noise-only range (see
  * fixtures/README.md). Passes when it drops by at least 20 dB.
+ *
+ * Each fixture gets a fresh engine: DFN, AGC and meters carry state, and a
+ * result must not depend on which file ran before.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,17 +30,19 @@ static const fixture kFixtures[] = {
 };
 
 int main(void) {
-    me_engine* engine = NULL;
-    CHECK_EQ_INT(me_engine_create(NULL, &engine), ME_OK);
-    if (engine == NULL) TEST_RESULT();
-    me_set_strength(engine, ME_STRENGTH_MEDIUM);
-
     for (size_t f = 0; f < sizeof kFixtures / sizeof kFixtures[0]; f++) {
         const fixture* fx = &kFixtures[f];
+        me_engine* engine = NULL;
+        CHECK_EQ_INT(me_engine_create(NULL, &engine), ME_OK);
+        if (engine == NULL) continue;
+        me_set_strength(engine, ME_STRENGTH_MEDIUM);
         size_t frames = 0;
         float* in = me_wav_load(me_fixture_path(fx->file), &frames);
         CHECK(in != NULL);
-        if (in == NULL) continue;
+        if (in == NULL) {
+            me_engine_destroy(engine);
+            continue;
+        }
         float* out = (float*)malloc(frames * sizeof(float));
         CHECK_EQ_INT(me_internal_process_buffer(engine, in, out, frames), ME_OK);
 
@@ -52,8 +57,7 @@ int main(void) {
 
         free(in);
         free(out);
+        me_engine_destroy(engine);
     }
-
-    me_engine_destroy(engine);
     TEST_RESULT();
 }

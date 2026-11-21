@@ -67,7 +67,8 @@ external int me_engine_switch_input(
   ffi.Pointer<ffi.Char> capture_id,
 );
 
-/// Current levels. Wait-free.
+/// Current input (raw) and output levels in dBFS, -90..0: peak with a 300 ms
+/// fall, RMS over ~50 ms. Silence when stopped or no audio arrives. Wait-free.
 @ffi.Native<ffi.Void Function(ffi.Pointer<me_engine>, ffi.Pointer<me_levels>)>(
   isLeaf: true,
 )
@@ -85,7 +86,9 @@ external void me_get_stats(
   ffi.Pointer<me_stats> out,
 );
 
-/// Current status. Wait-free. Returns ME_STATUS_ERROR for a NULL engine.
+/// Current status. Wait-free. While running, the user's bypass is reported
+/// before an automatic (overload) one. Returns ME_STATUS_ERROR for a NULL
+/// engine.
 @ffi.Native<me_status Function(ffi.Pointer<me_engine>)>(isLeaf: true)
 external int me_get_status(
   ffi.Pointer<me_engine> engine,
@@ -121,21 +124,24 @@ external int me_list_devices(
   int cap,
 );
 
-/// Automatic gain control on/off. Atomic store; valid in any state after create.
+/// Automatic gain control on/off (speech-gated, target -18 dBFS; the -1 dBFS
+/// limiter stays on). Atomic store; valid in any state after create.
 @ffi.Native<ffi.Void Function(ffi.Pointer<me_engine>, ffi.Uint8)>()
 external void me_set_agc(
   ffi.Pointer<me_engine> engine,
   int on,
 );
 
-/// User bypass (pass raw audio). Atomic store; valid in any state after create.
+/// User bypass (pass raw audio). Crossfades over 10 ms. Atomic store; valid
+/// in any state after create.
 @ffi.Native<ffi.Void Function(ffi.Pointer<me_engine>, ffi.Uint8)>()
 external void me_set_bypass(
   ffi.Pointer<me_engine> engine,
   int on,
 );
 
-/// Suppression strength, applied at the next frame. Valid in any state after create.
+/// Suppression strength (max attenuation 12 / 24 / 100 dB), applied at the
+/// next frame. Valid in any state after create.
 @ffi.Native<ffi.Void Function(ffi.Pointer<me_engine>, me_strength)>()
 external void me_set_strength(
   ffi.Pointer<me_engine> engine,

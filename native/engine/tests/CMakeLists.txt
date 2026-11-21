@@ -13,6 +13,9 @@ endfunction()
 me_add_test(test_ring_buffer)
 me_add_test(test_drift)
 me_add_test(test_denoise_fixtures wav_util.c)
+me_add_test(test_agc wav_util.c)
+me_add_test(test_crossfade)
+me_add_test(test_overload)
 
 # Allocation counter: its own shared library on macOS, because dyld never
 # interposes calls made inside the interposing image (see alloc_counter.h).

@@ -5,9 +5,6 @@
 
 #include "engine_internal.h"
 
-/* Max attenuation per strength preset, in dB. */
-static const float kStrengthAttenuationDb[] = {12.0f, 24.0f, 100.0f};
-
 void me_atomic_store_float(_Atomic uint32_t* slot, float value) {
     uint32_t bits;
     memcpy(&bits, &value, sizeof bits);
@@ -158,7 +155,7 @@ me_result me_engine_create(const char* model_path, me_engine** out) {
     atomic_init(&engine->status, ME_STATUS_STOPPED);
 
     char err[ME_ERROR_MAX] = {0};
-    engine->dfn = mdf_create(model_path, kStrengthAttenuationDb[ME_STRENGTH_MEDIUM], err,
+    engine->dfn = mdf_create(model_path, me_strength_attenuation_db(ME_STRENGTH_MEDIUM), err,
                              sizeof err);
     if (engine->dfn == NULL) {
         free(engine);
@@ -185,6 +182,7 @@ me_result me_engine_create(const char* model_path, me_engine** out) {
         return ME_ERR_DEVICE;
     }
 
+    me_processing_reset(engine);
     *out = engine;
     return ME_OK;
 }
@@ -226,6 +224,8 @@ me_result me_engine_start(me_engine* engine, const char* capture_id, const char*
     atomic_store(&engine->underruns, 0);
     me_atomic_store_float(&engine->avg_process_ms_bits, 0.0f);
     me_atomic_store_float(&engine->avg_out_fill_bits, 0.0f);
+    atomic_store(&engine->overload_events, 0);
+    me_processing_reset(engine);
 
     ma_device_config config =
         device_config(ma_device_type_playback, sink_id != NULL ? &sink : NULL, engine);
@@ -287,6 +287,9 @@ me_result me_engine_stop(me_engine* engine) {
     close_capture(engine);
     close_playback(engine);
     stop_processing(engine);
+    /* The processing thread has exited, so the meters can be reset here. */
+    me_levels_silence(&engine->levels);
+    atomic_store(&engine->overloaded, 0);
     engine->running = 0;
     atomic_store(&engine->status, ME_STATUS_STOPPED);
     return ME_OK;
@@ -308,21 +311,25 @@ void me_set_strength(me_engine* engine, me_strength strength) {
 me_status me_get_status(me_engine* engine) {
     if (engine == NULL) return ME_STATUS_ERROR;
     int32_t status = atomic_load_explicit(&engine->status, memory_order_relaxed);
-    if (status == ME_STATUS_RUNNING &&
-        atomic_load_explicit(&engine->bypass, memory_order_relaxed)) {
+    if (status != ME_STATUS_RUNNING) return status;
+    /* The user's own bypass wins over the automatic one. */
+    if (atomic_load_explicit(&engine->bypass, memory_order_relaxed)) {
         return ME_STATUS_BYPASSED_USER;
+    }
+    if (atomic_load_explicit(&engine->overloaded, memory_order_relaxed)) {
+        return ME_STATUS_BYPASSED_OVERLOAD;
     }
     return status;
 }
 
 void me_get_levels(me_engine* engine, me_levels* out) {
     if (out == NULL) return;
-    (void)engine;
-    /* Level metering arrives later; report silence until then. */
-    out->input_peak_db = -90.0f;
-    out->input_rms_db = -90.0f;
-    out->output_peak_db = -90.0f;
-    out->output_rms_db = -90.0f;
+    if (engine == NULL) {
+        out->input_peak_db = out->input_rms_db = ME_LEVEL_FLOOR_DB;
+        out->output_peak_db = out->output_rms_db = ME_LEVEL_FLOOR_DB;
+        return;
+    }
+    me_levels_read(&engine->levels, out);
 }
 
 void me_get_stats(me_engine* engine, me_stats* out) {
