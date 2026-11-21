@@ -17,7 +17,21 @@ flutter analyze --fatal-infos          # must be clean
 dart format .                          # must produce no changes
 flutter test                           # all tests pass
 flutter run -d macos                   # or -d windows
+
+# Native engine (C + Rust): unit, WAV-fixture and zero-allocation tests
+cmake -S native/engine -B build/native-tests -DCMAKE_BUILD_TYPE=Release
+cmake --build build/native-tests
+ctest --test-dir build/native-tests --output-on-failure
+
+dart run tool/ffigen.dart              # after changing mute_engine.h (needs LLVM / Xcode)
+dart run tool/ffigen_avfoundation.dart # macOS permission bindings (needs Xcode)
+dart run tool/make_tray_icons.dart     # regenerate assets/tray/
 ```
+
+Prerequisites beyond Flutter: Rust stable ≥ 1.70 (rustup; the build hook runs
+cargo for DeepFilterNet), CMake ≥ 3.24, and Xcode (macOS) or Visual Studio
+2022 C++ Build Tools (Windows). Clone with `--recurse-submodules`
+(DeepFilterNet, libASPL).
 
 Before saying work is done: run build_runner, analyze, format and test, and
 report the real results.
