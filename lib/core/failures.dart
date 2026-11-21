@@ -50,6 +50,16 @@ final class VirtualMicMissing extends Failure {
   const VirtualMicMissing([super.detail]);
 }
 
+/// The user cancelled an action (e.g. the administrator prompt).
+final class UserCancelled extends Failure {
+  const UserCancelled([super.detail]);
+}
+
+/// Installing the virtual microphone failed.
+final class InstallFailure extends Failure {
+  const InstallFailure([super.detail]);
+}
+
 /// Anything else.
 final class UnknownFailure extends Failure {
   const UnknownFailure([super.detail]);

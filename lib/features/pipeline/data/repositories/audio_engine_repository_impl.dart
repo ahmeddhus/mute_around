@@ -7,6 +7,8 @@ import 'package:mute_around/core/failures.dart';
 import 'package:mute_around/core/platform.dart';
 import 'package:mute_around/core/result.dart';
 import 'package:mute_around/features/pipeline/data/datasources/engine_data_source.dart';
+import 'package:mute_around/features/pipeline/domain/entities/audio_levels.dart';
+import 'package:mute_around/features/pipeline/domain/entities/engine_stats.dart';
 import 'package:mute_around/features/pipeline/domain/entities/input_device.dart';
 import 'package:mute_around/features/pipeline/domain/entities/pipeline_status.dart';
 import 'package:mute_around/features/pipeline/domain/repositories/audio_engine_repository.dart';
@@ -54,7 +56,22 @@ class AudioEngineRepositoryImpl implements AudioEngineRepository {
   }
 
   @override
+  Future<Result<Unit>> switchInput(String inputDeviceId) async {
+    final result = _engine.switchInput(inputDeviceId);
+    // The engine now targets this device whether or not it opened, so a
+    // DeviceDisconnected status refers to it.
+    _currentInputId = inputDeviceId;
+    return result;
+  }
+
+  @override
   Future<Result<Unit>> stop() async => _engine.stop();
+
+  @override
+  Stream<AudioLevels> watchLevels() => _engine.levels;
+
+  @override
+  Result<EngineStats> stats() => _engine.stats();
 
   @override
   Result<Unit> setBypass({required bool enabled}) =>

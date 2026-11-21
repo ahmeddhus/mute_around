@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mute_around/features/pipeline/domain/entities/pipeline_status.dart';
 
 /// What the pipeline is doing, in plain words.
-class StatusBanner extends StatelessWidget {
+/// Status changes are announced to screen readers.
+class StatusBanner extends StatefulWidget {
   const StatusBanner({super.key, required this.status});
 
   final PipelineStatus status;
@@ -21,7 +25,28 @@ class StatusBanner extends StatelessWidget {
   };
 
   @override
+  State<StatusBanner> createState() => _StatusBannerState();
+}
+
+class _StatusBannerState extends State<StatusBanner> {
+  @override
+  void didUpdateWidget(StatusBanner old) {
+    super.didUpdateWidget(old);
+    final text = StatusBanner.label(widget.status);
+    if (text != StatusBanner.label(old.status)) {
+      unawaited(
+        SemanticsService.sendAnnouncement(
+          View.of(context),
+          text,
+          Directionality.of(context),
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final status = widget.status;
     final scheme = Theme.of(context).colorScheme;
     final (icon, background, foreground) = switch (status) {
       Processing() => (
@@ -52,7 +77,7 @@ class StatusBanner extends StatelessWidget {
               Icon(icon, color: foreground),
               Expanded(
                 child: Text(
-                  label(status),
+                  StatusBanner.label(status),
                   style: Theme.of(
                     context,
                   ).textTheme.titleMedium?.copyWith(color: foreground),

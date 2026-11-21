@@ -5,6 +5,7 @@ import 'package:mute_around/core/failures.dart';
 import 'package:mute_around/core/result.dart';
 import 'package:mute_around/features/pipeline/data/datasources/engine_data_source.dart';
 import 'package:mute_around/features/pipeline/data/datasources/ffi_engine_data_source.dart';
+import 'package:mute_around/features/pipeline/domain/entities/audio_levels.dart';
 
 import '../../../../core/native/null_backend.dart';
 
@@ -89,5 +90,65 @@ void main() {
     expect(done, isTrue);
     expect(source.stop().failureOrNull, isA<EngineStateFailure>());
     await source.dispose(); // idempotent
+  });
+
+  test('switchInput: keeps running; errors are Failures', () async {
+    final source = FfiEngineDataSource();
+    addTearDown(source.dispose);
+    expect(
+      source.switchInput('null:0').failureOrNull,
+      isA<EngineStateFailure>(),
+    );
+    final capture = source.listDevices(.capture).valueOrNull!;
+    expect(source.start(captureId: capture.first.id), const Ok(unit));
+    expect(source.switchInput(capture.first.id), const Ok(unit));
+    expect(
+      source.switchInput('no-such-mic').failureOrNull,
+      isA<DeviceNotFound>(),
+    );
+    expect(source.stop(), const Ok(unit));
+  });
+
+  test(
+    'levels: polled while listened and visible, paused when hidden',
+    () async {
+      final source = FfiEngineDataSource();
+      addTearDown(source.dispose);
+      expect(source.start(), const Ok(unit));
+      final readings = <AudioLevels>[];
+      final sub = source.levels.listen(readings.add);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(readings.length, inInclusiveRange(3, 8)); // ~30 Hz
+      for (final l in readings) {
+        for (final db in [
+          l.inputPeakDb,
+          l.inputRmsDb,
+          l.outputPeakDb,
+          l.outputRmsDb,
+        ]) {
+          expect(db, inInclusiveRange(-90, 0));
+        }
+      }
+      source.setVisible(visible: false);
+      final hiddenStart = readings.length;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(readings.length, hiddenStart);
+      source.setVisible(visible: true);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(readings.length, greaterThan(hiddenStart));
+      await sub.cancel();
+    },
+  );
+
+  test('stats count processed frames while running', () async {
+    final source = FfiEngineDataSource();
+    addTearDown(source.dispose);
+    expect(source.start(), const Ok(unit));
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final stats = source.stats().valueOrNull!;
+    expect(stats.framesProcessed, greaterThan(0));
+    expect(stats.estimatedLatencyMs, inInclusiveRange(1, 50));
+    expect(source.stop(), const Ok(unit));
+    expect(source.stats().valueOrNull!.estimatedLatencyMs, 0);
   });
 }

@@ -9,6 +9,8 @@ import 'package:mute_around/core/platform.dart';
 import 'package:mute_around/core/result.dart';
 import 'package:mute_around/features/pipeline/data/datasources/engine_data_source.dart';
 import 'package:mute_around/features/pipeline/data/repositories/audio_engine_repository_impl.dart';
+import 'package:mute_around/features/pipeline/domain/entities/audio_levels.dart';
+import 'package:mute_around/features/pipeline/domain/entities/engine_stats.dart';
 import 'package:mute_around/features/pipeline/domain/entities/input_device.dart';
 import 'package:mute_around/features/pipeline/domain/entities/pipeline_status.dart';
 import 'package:mute_around/features/settings/domain/entities/processing_settings.dart';
@@ -184,5 +186,72 @@ void main() {
       const PipelineStatus.deviceDisconnected('usb-123'),
       isA<EngineError>(),
     ]);
+  });
+
+  group('switchInput', () {
+    test(
+      'passes through; DeviceDisconnected then names the new device',
+      () async {
+        final controller = StreamController<EngineStatus>();
+        addTearDown(controller.close);
+        when(() => engine.status).thenAnswer((_) => controller.stream);
+        when(() => engine.switchInput('usb-123')).thenReturn(const Ok(unit));
+        final r = repo(.macos);
+        expect(await r.switchInput('usb-123'), const Ok(unit));
+        final next = r.watchStatus().first;
+        controller.add(EngineStatus.deviceDisconnected);
+        expect(await next, const PipelineStatus.deviceDisconnected('usb-123'));
+      },
+    );
+
+    test('a failed switch is returned', () async {
+      when(
+        () => engine.switchInput('gone'),
+      ).thenReturn(const Err(DeviceNotFound('gone')));
+      expect(
+        await repo(.windows).switchInput('gone'),
+        const Err<Unit>(DeviceNotFound('gone')),
+      );
+    });
+  });
+
+  test('setters propagate Err', () {
+    when(
+      () => engine.setAgc(enabled: any(named: 'enabled')),
+    ).thenReturn(const Err(EngineStateFailure('disposed')));
+    when(
+      () => engine.setBypass(enabled: any(named: 'enabled')),
+    ).thenReturn(const Err(EngineStateFailure('disposed')));
+    when(
+      () => engine.setStrength(any()),
+    ).thenReturn(const Err(EngineStateFailure('disposed')));
+    final r = repo(.macos);
+    const err = Err<Unit>(EngineStateFailure('disposed'));
+    expect(r.setAgc(enabled: true), err);
+    expect(r.setBypass(enabled: true), err);
+    expect(r.setStrength(.low), err);
+  });
+
+  test('levels and stats pass through', () async {
+    const levels = AudioLevels(inputPeakDb: -6, outputRmsDb: -30);
+    when(() => engine.levels).thenAnswer((_) => Stream.value(levels));
+    const stats = EngineStats(
+      framesProcessed: 10,
+      avgProcessMs: 0.4,
+      estimatedLatencyMs: 30,
+      underruns: 0,
+      overloadEvents: 1,
+    );
+    when(() => engine.stats()).thenReturn(const Ok(stats));
+    final r = repo(.macos);
+    expect(await r.watchLevels().single, levels);
+    expect(r.stats(), const Ok(stats));
+  });
+
+  test('setUiVisible passes through', () {
+    when(() => engine.setVisible(visible: any(named: 'visible')))
+        .thenReturn(null);
+    repo(.macos).setUiVisible(visible: false);
+    verify(() => engine.setVisible(visible: false)).called(1);
   });
 }

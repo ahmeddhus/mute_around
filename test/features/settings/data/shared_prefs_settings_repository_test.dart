@@ -86,6 +86,22 @@ void main() {
     expect(result, isA<Err<Unit>>());
     expect(result.failureOrNull, isA<UnknownFailure>());
   });
+
+  test('concurrent updates are applied in order, none lost', () async {
+    final a = repository.update((s) => s.copyWith(agcEnabled: false));
+    final b = repository.update((s) => s.copyWith(strength: .low));
+    final c = repository.update((s) => s.copyWith(userBypass: true));
+    expect(await Future.wait([a, b, c]), everyElement(const Ok(unit)));
+    expect(
+      await repository.load(),
+      const Ok(
+        ProcessingSettings(agcEnabled: false, strength: .low, userBypass: true),
+      ),
+    );
+    expect(prefs.values['agc_enabled'], false);
+    expect(prefs.values['strength'], 'low');
+    expect(prefs.values['user_bypass'], true);
+  });
 }
 
 /// In-memory [SharedPreferencesAsync] for tests.

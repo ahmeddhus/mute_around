@@ -11,6 +11,13 @@ abstract interface class SettingsRepository {
   /// when the write that includes these settings has finished.
   Future<Result<Unit>> save(ProcessingSettings settings);
 
+  /// Applies [change] to the current settings and saves the result.
+  /// Concurrent updates are applied one after another, so none is lost.
+  /// Unreadable stored settings count as the defaults.
+  Future<Result<Unit>> update(
+    ProcessingSettings Function(ProcessingSettings current) change,
+  );
+
   /// Writes any debounced changes now (e.g. before the app exits).
   Future<void> flush();
 }

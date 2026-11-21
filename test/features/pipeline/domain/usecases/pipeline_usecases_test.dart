@@ -72,7 +72,7 @@ void main() {
           userBypass: true,
         ),
       );
-      expect(await startPipeline(), const Ok(unit));
+      expect(await startPipeline(), const Ok('usb'));
       expect(calls, ['strength high', 'agc false', 'bypass true', 'start usb']);
     });
 
@@ -80,20 +80,35 @@ void main() {
       'falls back to the OS default when the stored device is gone',
       () async {
         givenSettings(const ProcessingSettings(inputDeviceId: 'unplugged'));
-        expect(await startPipeline(), const Ok(unit));
-        expect(calls.last, 'start null');
+        expect(await startPipeline(), const Ok('BuiltIn'));
+        expect(calls.last, 'start BuiltIn');
+      },
+    );
+
+    test(
+      'OS default is our own virtual mic (filtered out) → first listed mic, '
+      'never null',
+      () async {
+        // The repository already removed the virtual mic, so no entry is
+        // the default; passing null would let the engine open it.
+        givenSettings(const ProcessingSettings());
+        when(
+          () => engine.listInputDevices(),
+        ).thenAnswer((_) async => Ok([usb, InputDevice(id: 'cam', name: 'C')]));
+        expect(await startPipeline(), const Ok('usb'));
+        expect(calls.last, 'start usb');
       },
     );
 
     test('uses defaults when settings cannot be read', () async {
       when(() => loadSettings())
           .thenAnswer((_) async => const Err(UnknownFailure()));
-      expect(await startPipeline(), const Ok(unit));
+      expect(await startPipeline(), const Ok('BuiltIn'));
       expect(calls, [
         'strength medium',
         'agc true',
         'bypass false',
-        'start null',
+        'start BuiltIn',
       ]);
     });
 
@@ -111,14 +126,14 @@ void main() {
       givenSettings(const ProcessingSettings());
       when(() => engine.start(inputDeviceId: any(named: 'inputDeviceId')))
           .thenAnswer((_) async => const Err(VirtualMicMissing()));
-      expect(await startPipeline(), const Err<Unit>(VirtualMicMissing()));
+      expect(await startPipeline(), const Err<String>(VirtualMicMissing()));
     });
 
     test('a failing setter aborts before start', () async {
       givenSettings(const ProcessingSettings());
       when(() => engine.setStrength(any()))
           .thenReturn(const Err(ModelLoadFailure()));
-      expect(await startPipeline(), const Err<Unit>(ModelLoadFailure()));
+      expect(await startPipeline(), const Err<String>(ModelLoadFailure()));
       verifyNever(
         () => engine.start(inputDeviceId: any(named: 'inputDeviceId')),
       );

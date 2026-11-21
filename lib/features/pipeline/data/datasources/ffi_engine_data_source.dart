@@ -10,6 +10,8 @@ import 'package:mute_around/core/native/engine_library.dart';
 import 'package:mute_around/core/native/mute_engine.ffigen.dart';
 import 'package:mute_around/core/result.dart';
 import 'package:mute_around/features/pipeline/data/datasources/engine_data_source.dart';
+import 'package:mute_around/features/pipeline/domain/entities/audio_levels.dart';
+import 'package:mute_around/features/pipeline/domain/entities/engine_stats.dart';
 import 'package:mute_around/features/settings/domain/entities/processing_settings.dart';
 
 /// [EngineDataSource] over the native engine through FFI.
@@ -36,7 +38,9 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
   bool _disposed = false;
   bool _visible = true;
   Timer? _poll;
+  Timer? _levelsPoll;
   EngineStatus? _lastStatus;
+  Pointer<me_levels>? _levelsBuf;
 
   late final StreamController<EngineStatus> _status =
       StreamController<EngineStatus>.broadcast(
@@ -44,8 +48,17 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
         onCancel: _stopPolling,
       );
 
+  late final StreamController<AudioLevels> _levels =
+      StreamController<AudioLevels>.broadcast(
+        onListen: _updateLevelsPolling,
+        onCancel: _updateLevelsPolling,
+      );
+
   @override
   Stream<EngineStatus> get status => _status.stream;
+
+  @override
+  Stream<AudioLevels> get levels => _levels.stream;
 
   @override
   Result<List<AudioDevice>> listDevices(DeviceKind kind) =>
@@ -85,6 +98,32 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
       });
 
   @override
+  Result<Unit> switchInput(String captureId) => _withEngine((engine) {
+    return using((arena) {
+      final r = me_engine_switch_input(engine, toCString(captureId, arena));
+      return r == ME_OK ? const Ok(unit) : Err(_failure(engine, r));
+    });
+  });
+
+  @override
+  Result<EngineStats> stats() => _withEngine((engine) {
+    return using((arena) {
+      final out = arena<me_stats>();
+      me_get_stats(engine, out);
+      final s = out.ref;
+      return Ok(
+        EngineStats(
+          framesProcessed: s.frames_processed,
+          avgProcessMs: s.avg_process_ms,
+          estimatedLatencyMs: s.estimated_latency_ms,
+          underruns: s.underruns,
+          overloadEvents: s.overload_events,
+        ),
+      );
+    });
+  });
+
+  @override
   Result<Unit> stop() => _withEngine((engine) {
     final r = me_engine_stop(engine);
     return r == ME_OK ? const Ok(unit) : Err(_failure(engine, r));
@@ -118,6 +157,7 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
     if (_visible == visible) return;
     _visible = visible;
     if (_poll != null) _restartPolling();
+    _updateLevelsPolling();
   }
 
   /// The current polling interval (for tests and diagnostics).
@@ -129,7 +169,13 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
     if (_disposed) return;
     _disposed = true;
     _stopPolling();
+    _levelsPoll?.cancel();
+    _levelsPoll = null;
     await _status.close();
+    await _levels.close();
+    final buf = _levelsBuf;
+    if (buf != null) calloc.free(buf);
+    _levelsBuf = null;
     if (_engine != nullptr) {
       engineFinalizer.detach(this);
       me_engine_destroy(_engine);
@@ -155,6 +201,33 @@ class FfiEngineDataSource implements EngineDataSource, Finalizable {
       _lastStatus = status;
       _status.add(status);
     }
+  }
+
+  /// Meters poll at [visibleInterval] while anyone listens and the window
+  /// is visible; hidden, they stop (nobody sees them).
+  void _updateLevelsPolling() {
+    final wanted = _levels.hasListener && _visible && !_disposed;
+    if (wanted && _levelsPoll == null) {
+      _levelsPoll = Timer.periodic(visibleInterval, (_) => _pollLevels());
+    } else if (!wanted) {
+      _levelsPoll?.cancel();
+      _levelsPoll = null;
+    }
+  }
+
+  void _pollLevels() {
+    if (_engine == nullptr || _levels.isClosed) return;
+    final buf = _levelsBuf ??= calloc<me_levels>();
+    me_get_levels(_engine, buf);
+    final l = buf.ref;
+    _levels.add(
+      AudioLevels(
+        inputPeakDb: l.input_peak_db,
+        inputRmsDb: l.input_rms_db,
+        outputPeakDb: l.output_peak_db,
+        outputRmsDb: l.output_rms_db,
+      ),
+    );
   }
 
   static EngineStatus _statusFromNative(int status) => switch (status) {

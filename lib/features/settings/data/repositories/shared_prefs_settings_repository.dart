@@ -29,6 +29,7 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
   ProcessingSettings? _pending;
   Timer? _timer;
   Completer<Result<Unit>>? _pendingWrite;
+  Future<void> _updates = Future.value();
 
   @override
   Future<Result<ProcessingSettings>> load() async {
@@ -62,6 +63,21 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
     _timer?.cancel();
     _timer = Timer(debounce, _flush);
     return (_pendingWrite ??= Completer<Result<Unit>>()).future;
+  }
+
+  @override
+  Future<Result<Unit>> update(
+    ProcessingSettings Function(ProcessingSettings current) change,
+  ) {
+    final done = Completer<Result<Unit>>();
+    // Chain updates so each one sees the previous one's result.
+    _updates = _updates.then((_) async {
+      final current = (await load()).valueOrNull ?? const ProcessingSettings();
+      // save() sets _pending synchronously, so the next update's load()
+      // already returns these settings.
+      done.complete(save(change(current)));
+    });
+    return done.future;
   }
 
   @override
