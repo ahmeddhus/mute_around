@@ -41,9 +41,10 @@ linked nor shipped:
 - `unicode-ident` — (MIT OR Apache-2.0) AND Unicode-DFS-2016, via
   `proc-macro2`; listed as an exception in `deny.toml`.
 
-The Windows-only crates (`x86_64-pc-windows-msvc`, e.g. `winapi`) haven't
-been audited yet: run the `cargo deny` command on a machine with the
-Windows dependencies fetched.
+`cargo deny check licenses` passed on 2026-11-22 for both
+`aarch64-apple-darwin` and `x86_64-pc-windows-msvc`, so the Windows-only
+crates (e.g. `winapi`) are covered too. CI re-runs it on every pull request
+(the "Rust dependency licenses" job in `.github/workflows/ci.yml`).
 
 Attribution: MIT and Apache-2.0 require keeping the copyright and license
 notices. The crates' license texts are in their sources on crates.io; the
