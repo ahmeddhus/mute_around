@@ -107,4 +107,4 @@ jobs:
       - name: cargo deny check licenses
         run: >
           cargo deny --manifest-path native/engine/dfshim/Cargo.toml
-          check --config native/engine/third_party/deny.toml licenses
+          --config native/engine/third_party/deny.toml check licenses
