@@ -7,6 +7,10 @@ function(me_add_test name)
   target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
                                              ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
   target_compile_definitions(${name} PRIVATE ME_FIXTURES_DIR="${FIXTURES_DIR}")
+  # MSVC only defines M_PI and friends in <math.h> on request.
+  if(MSVC)
+    target_compile_definitions(${name} PRIVATE _USE_MATH_DEFINES)
+  endif()
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
