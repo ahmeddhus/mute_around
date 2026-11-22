@@ -77,6 +77,9 @@ else()
 endif()
 if(MSVC)
   target_compile_options(mute_engine_core PRIVATE /W4)
+  # <stdatomic.h> is opt-in on MSVC. PUBLIC: the tests include the same
+  # headers (ring_buffer.h, levels.h).
+  target_compile_options(mute_engine_core PUBLIC /experimental:c11atomics)
 else()
   target_compile_options(mute_engine_core PRIVATE -Wall -Wextra)
 endif()
