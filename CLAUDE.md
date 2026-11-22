@@ -26,6 +26,7 @@ ctest --test-dir build/native-tests --output-on-failure
 dart run tool/ffigen.dart              # after changing mute_engine.h (needs LLVM / Xcode)
 dart run tool/ffigen_avfoundation.dart # macOS permission bindings (needs Xcode)
 dart run tool/make_tray_icons.dart     # regenerate assets/tray/
+dart tool/rust_licenses.dart           # after changing dfshim/Cargo.lock (Rust crate licenses)
 ```
 
 Prerequisites beyond Flutter: Rust stable ≥ 1.70 (rustup; the build hook runs

@@ -24,6 +24,7 @@ licenses page, and its license text MUST ship with the app.
 | libASPL | v3.1.2 | macOS Audio Server plug-in (virtual mic) | MIT (parts derived from Apple sample code, also under MIT terms) | `native/macos_hal/third_party/libASPL` (submodule) |
 | dr_wav (tests only, not shipped) | 0.14.6 | Reading WAV fixtures | Public domain (Unlicense) or MIT-0 | `native/engine/tests/third_party/dr_wav.h` |
 | Rust crates linked into libDF | see `native/engine/dfshim/Cargo.lock` | tract (ONNX inference), ndarray, rustfft, … | MIT, Apache-2.0, Zlib, Unlicense, 0BSD (see below) | crates.io |
+| Rust standard library | the Rust toolchain used to build | Linked into the engine with the crates | MIT / Apache-2.0 | rustup |
 
 ### Rust dependency audit
 
@@ -46,10 +47,23 @@ linked nor shipped:
 crates (e.g. `winapi`) are covered too. CI re-runs it on every pull request
 (the "Rust dependency licenses" job in `.github/workflows/ci.yml`).
 
-Attribution: MIT and Apache-2.0 require keeping the copyright and license
-notices. The crates' license texts are in their sources on crates.io; the
-app's licenses page lists libDF/DeepFilterNet (MIT/Apache-2.0), which covers
-the code we build from source.
+Attribution: MIT and Apache-2.0 require keeping each copyright and license
+notice. `tool/rust_licenses.dart` collects the license and notice files of
+every crate linked into the engine, on both targets, plus the Rust standard
+library, into `native/engine/third_party/rust_licenses.json`. That file is
+bundled with the app and registered in `lib/app/licenses.dart`, so every
+crate appears on the licenses page. "Linked" means reachable through normal
+dependencies (not build or dev ones), minus proc macros, so 84 crates
+rather than the 169 that `cargo tree` lists. `realfft` packages no license
+file, so its MIT text is built from its declared author.
+
+Regenerate the file after changing `Cargo.lock`:
+
+```bash
+dart tool/rust_licenses.dart
+```
+
+CI runs `dart tool/rust_licenses.dart --check` and fails if it's out of date.
 
 ## Tray icons
 

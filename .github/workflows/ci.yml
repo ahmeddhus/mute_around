@@ -119,3 +119,10 @@ jobs:
         run: >
           cargo deny --manifest-path native/engine/dfshim/Cargo.toml
           --config native/engine/third_party/deny.toml check licenses
+
+      # The licenses page lists every linked crate from this generated file;
+      # fail when Cargo.lock changed without regenerating it.
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Rust crate license texts are up to date
+        run: dart tool/rust_licenses.dart --check
