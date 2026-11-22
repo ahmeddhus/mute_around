@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.ahmeddhus.mutearound" "\0"
-            VALUE "FileDescription", "mute_around" "\0"
+            VALUE "FileDescription", "Mute Around" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "mute_around" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.ahmeddhus.mutearound. All rights reserved." "\0"
             VALUE "OriginalFilename", "mute_around.exe" "\0"
-            VALUE "ProductName", "mute_around" "\0"
+            VALUE "ProductName", "Mute Around" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
