@@ -23,16 +23,19 @@ if(WIN32)
 else()
   set(MDF_LIB "${MDF_TARGET_DIR}/release/libmute_df.a")
 endif()
-# cargo needs rustc next to it on PATH (rustup keeps both in the same folder).
-get_filename_component(CARGO_DIR "${CARGO}" DIRECTORY)
+# cargo needs rustc next to it on PATH. Homebrew's rustup keeps both in a
+# folder that isn't on PATH, so prepend it there. On Windows, rustup puts
+# both on PATH already, and wrapping the call in `cmake -E env` with the
+# whole Windows PATH broke the build ("no such file or directory").
 if(WIN32)
-  set(CARGO_PATH "PATH=${CARGO_DIR};$ENV{PATH}")
+  set(CARGO_CMD "${CARGO}")
 else()
-  set(CARGO_PATH "PATH=${CARGO_DIR}:$ENV{PATH}")
+  get_filename_component(CARGO_DIR "${CARGO}" DIRECTORY)
+  set(CARGO_CMD "${CMAKE_COMMAND}" -E env "PATH=${CARGO_DIR}:$ENV{PATH}" "${CARGO}")
 endif()
 add_custom_command(
   OUTPUT "${MDF_LIB}"
-  COMMAND "${CMAKE_COMMAND}" -E env "${CARGO_PATH}" "${CARGO}" build --release --locked --manifest-path "${MDF_DIR}/Cargo.toml"
+  COMMAND ${CARGO_CMD} build --release --locked --manifest-path "${MDF_DIR}/Cargo.toml"
           --target-dir "${MDF_TARGET_DIR}"
   DEPENDS "${MDF_DIR}/Cargo.toml" "${MDF_DIR}/Cargo.lock" "${MDF_DIR}/src/lib.rs"
           "${MDF_DIR}/src/rt_alloc.rs"
