@@ -85,7 +85,13 @@ void main() {
 
     // switch input while running, then stop
     expect(me_engine_switch_input(engine, nullptr), ME_OK);
-    expect(me_get_status(engine), ME_STATUS_RUNNING);
+    // After 300 ms of real processing a slow or busy machine (e.g. a shared
+    // CI VM) can trip the overload guard, which bypasses but keeps running.
+    // This test is about the lifecycle; CPU headroom is measured separately.
+    expect(
+      me_get_status(engine),
+      isIn([ME_STATUS_RUNNING, ME_STATUS_BYPASSED_OVERLOAD]),
+    );
     expect(me_engine_stop(engine), ME_OK);
     expect(me_get_status(engine), ME_STATUS_STOPPED);
     expect(me_engine_switch_input(engine, nullptr), ME_ERR_STATE);

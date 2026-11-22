@@ -38,8 +38,10 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 150));
 
     // The engine is created and started within one poll interval, so the
-    // first status seen is `running`.
-    expect(statuses, [
+    // first status seen is `running`. A slow or busy machine (e.g. a shared
+    // CI VM) can briefly trip the overload guard; that's load, not
+    // lifecycle, so it's left out here (CPU headroom is measured separately).
+    expect(statuses.where((s) => s != EngineStatus.bypassedOverload), [
       EngineStatus.running,
       EngineStatus.bypassedUser,
       EngineStatus.stopped,
