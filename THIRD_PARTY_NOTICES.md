@@ -1,7 +1,8 @@
 # Third-Party Notices
 
-Mute Around uses open-source components. Only permissive licenses (MIT, BSD,
-Apache-2.0, zlib) are allowed — see `CLAUDE.md`.
+Mute Around uses open-source components. Only permissive licenses (MIT,
+MIT-0, BSD, Apache-2.0, zlib, ISC, Unicode-3.0, public domain) are allowed —
+see `CLAUDE.md`.
 
 ## Dart / Flutter packages
 
@@ -15,7 +16,44 @@ Flutter does not collect these automatically. Each entry MUST also be
 registered in the app with `LicenseRegistry.addLicense` so it appears on the
 licenses page, and its license text MUST ship with the app.
 
-| Component | Used for | License | Status |
-|---|---|---|---|
-| DeepFilterNet 3 (code) | Noise suppression engine | MIT / Apache-2.0 | Planned |
-| DeepFilterNet 3 (model weights) | Trained model | To verify before bundling | Planned |
+| Component | Version | Used for | License | Where |
+|---|---|---|---|---|
+| DeepFilterNet 3 / libDF (code) | v0.5.6 | Noise suppression engine | MIT / Apache-2.0 | `native/engine/third_party/deepfilternet` (submodule) |
+| DeepFilterNet 3 low-latency model weights | v0.5.6 | Trained model, embedded in the engine | MIT / Apache-2.0 | `models/DeepFilterNet3_ll_onnx.tar.gz` in the submodule |
+| miniaudio | 0.11.26 | Audio capture/playback (Core Audio, WASAPI) | Public domain (Unlicense) or MIT-0 | `native/engine/third_party/miniaudio` |
+| libASPL | v3.1.2 | macOS Audio Server plug-in (virtual mic) | MIT (parts derived from Apple sample code, also under MIT terms) | `native/macos_hal/third_party/libASPL` (submodule) |
+| dr_wav (tests only, not shipped) | 0.14.6 | Reading WAV fixtures | Public domain (Unlicense) or MIT-0 | `native/engine/tests/third_party/dr_wav.h` |
+| Rust crates linked into libDF | see `native/engine/dfshim/Cargo.lock` | tract (ONNX inference), ndarray, rustfft, … | MIT, Apache-2.0, Zlib, Unlicense, 0BSD (see below) | crates.io |
+
+### Rust dependency audit
+
+`native/engine/third_party/deny.toml` allows only the project's
+licenses; check with `cargo deny` (command in that file).
+
+Audited 2026-11-21 from `cargo tree` for `aarch64-apple-darwin` (169
+crates): every crate is MIT, Apache-2.0, MIT OR Apache-2.0, a
+Zlib/MIT/Apache choice, Unlicense OR MIT, or 0BSD OR MIT OR Apache-2.0,
+except two used only while compiling (by proc macros), which are neither
+linked nor shipped:
+
+- `tiny-keccak` — CC0-1.0 (a public-domain dedication), via
+  `const-random-macro`.
+- `unicode-ident` — (MIT OR Apache-2.0) AND Unicode-DFS-2016, via
+  `proc-macro2`; listed as an exception in `deny.toml`.
+
+The Windows-only crates (`x86_64-pc-windows-msvc`, e.g. `winapi`) haven't
+been audited yet: run the `cargo deny` command on a machine with the
+Windows dependencies fetched.
+
+Attribution: MIT and Apache-2.0 require keeping the copyright and license
+notices. The crates' license texts are in their sources on crates.io; the
+app's licenses page lists libDF/DeepFilterNet (MIT/Apache-2.0), which covers
+the code we build from source.
+
+## Tray icons
+
+`assets/tray/` icons are drawn by `tool/make_tray_icons.dart` from simple
+shapes, in this repository; CC0 1.0.
+
+The WAV fixtures in `native/engine/tests/fixtures/` are synthetic, generated
+by this repository, and released under CC0 1.0.

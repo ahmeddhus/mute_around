@@ -56,3 +56,4 @@ app.*.map.json
 *.config.dart
 *.module.dart
 *.injectable.json
+native/engine/dfshim/target/

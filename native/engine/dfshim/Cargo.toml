@@ -1,0 +1,29 @@
+# mute_df: a thin C API over DeepFilterNet's libDF for the Mute Around engine.
+#
+# Why not libDF's own `capi` feature: its `df_create` dereferences the model
+# path without a NULL check and panics (aborting the process) when the model
+# can't be loaded, and its `df_process_frame` panics on errors. This shim
+# returns errors instead, embeds the DFN3 low-latency model, and never lets a
+# panic cross the C boundary.
+[package]
+name = "mute_df"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[dependencies]
+deep_filter = { path = "../third_party/deepfilternet/libDF", default-features = false, features = ["tract", "default-model-ll"] }
+ndarray = "0.15"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+debug = false
+
+# Standalone: not part of the DeepFilterNet workspace.
+[workspace]

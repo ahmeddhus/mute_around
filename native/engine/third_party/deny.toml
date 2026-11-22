@@ -1,0 +1,38 @@
+# cargo-deny configuration for the Rust code linked into the engine (the
+# DeepFilterNet shim and libDF). Only the licenses the project allows
+# pass. Run from the repository root:
+#
+#   cargo deny --manifest-path native/engine/dfshim/Cargo.toml \
+#     check --config native/engine/third_party/deny.toml licenses
+#
+# Install with `cargo install --locked cargo-deny`.
+
+[graph]
+targets = ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+
+[licenses]
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "0BSD",
+  "Zlib",
+  "ISC",
+  "Unicode-3.0",
+  "Unlicense",
+  "CC0-1.0",
+]
+confidence-threshold = 0.9
+
+# unicode-ident's data tables are under Unicode-DFS-2016, the predecessor of
+# the allowed Unicode-3.0 terms. It's a dependency of proc-macro2, used only
+# while compiling (proc macros), and is neither linked into nor shipped with
+# the app.
+[[licenses.exceptions]]
+crate = "unicode-ident"
+allow = ["Unicode-DFS-2016"]
+
+[bans]
+multiple-versions = "allow"
