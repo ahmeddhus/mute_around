@@ -130,6 +130,10 @@ void main() {
         }
       }
       source.setVisible(visible: false);
+      // A broadcast stream delivers events in a later microtask, so a reading
+      // taken just before hiding can still be on its way. Let it land before
+      // counting; only readings after this point would mean polling went on.
+      await Future<void>.delayed(Duration.zero);
       final hiddenStart = readings.length;
       await Future<void>.delayed(const Duration(milliseconds: 150));
       expect(readings.length, hiddenStart);
