@@ -22,6 +22,10 @@ env:
 jobs:
   flutter:
     name: Flutter + native engine (${{ matrix.os }})
+    # While the repo is private, macOS/Windows minutes are billed at a
+    # multiplier, so this job only runs when started by hand (Actions → CI →
+    # Run workflow). Once the repo is public it runs on every PR and push.
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
       matrix:
