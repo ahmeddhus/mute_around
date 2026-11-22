@@ -1,0 +1,99 @@
+# Checks every pull request (and every push to master) on both supported
+# platforms. Mirrors the "Commands" section of CLAUDE.md.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the run that's still going.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.50.1
+
+jobs:
+  flutter:
+    name: Flutter + native engine (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install Dart dependencies
+        run: flutter pub get
+
+      # Before build_runner, so generated (uncommitted) files aren't checked.
+      - name: Check formatting
+        if: runner.os == 'macOS'
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Generate code
+        run: dart run build_runner build -d
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Dart tests
+        run: flutter test
+
+      # Unit, WAV-fixture and zero-allocation tests for the C engine.
+      - name: Configure native tests
+        run: cmake -S native/engine -B build/native-tests -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build native tests
+        run: cmake --build build/native-tests --config Release
+
+      - name: Run native tests
+        run: ctest --test-dir build/native-tests --build-config Release --output-on-failure
+
+      # Catches breakage in the build hook, the HAL plug-in (macOS) and the
+      # runner projects that the tests above don't compile.
+      - name: Build app (macOS)
+        if: runner.os == 'macOS'
+        run: flutter build macos --debug
+
+      - name: Build app (Windows)
+        if: runner.os == 'Windows'
+        run: flutter build windows --debug
+
+  licenses:
+    name: Rust dependency licenses
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      # deny.toml targets both aarch64-apple-darwin and x86_64-pc-windows-msvc,
+      # so the Windows-only crates are checked from this runner too.
+      - name: cargo deny check licenses
+        run: >
+          cargo deny --manifest-path native/engine/dfshim/Cargo.toml
+          check --config native/engine/third_party/deny.toml licenses
