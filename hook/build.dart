@@ -67,6 +67,8 @@ void main(List<String> args) async {
           'ntdll',
           'bcrypt',
           'advapi32',
+          // WaitOnAddress / WakeByAddress*, used by Rust std's locks.
+          'synchronization',
         ],
       ),
       _ => throw UnsupportedError(

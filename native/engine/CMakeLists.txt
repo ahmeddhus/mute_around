@@ -45,7 +45,8 @@ add_dependencies(mute_df mute_df_build)
 if(APPLE)
   target_link_libraries(mute_df INTERFACE "-framework CoreFoundation" "-framework Security")
 elseif(WIN32)
-  target_link_libraries(mute_df INTERFACE ws2_32 userenv ntdll bcrypt advapi32)
+  # synchronization: WaitOnAddress / WakeByAddress*, used by Rust std's locks.
+  target_link_libraries(mute_df INTERFACE ws2_32 userenv ntdll bcrypt advapi32 synchronization)
 endif()
 
 # --- Engine --------------------------------------------------------------
