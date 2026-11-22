@@ -35,6 +35,17 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # DeepFilterNet (libDF + tract) is the slowest part of the build, and it's
+      # compiled twice: by the Dart build hook and by the CMake test project,
+      # each with its own --target-dir. Cache the cargo registry and both
+      # target dirs (rust-cache keeps dependencies, drops our own crate).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            native/engine/dfshim -> ../../../.dart_tool/hooks_runner/shared/mute_around/build/cargo
+            native/engine/dfshim -> ../../../build/native-tests/cargo
+          cache-on-failure: true
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
