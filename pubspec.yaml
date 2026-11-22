@@ -58,3 +58,5 @@ flutter:
     - native/engine/third_party/deepfilternet/LICENSE-APACHE
     - native/engine/models/LICENSE-MIT
     - native/macos_hal/third_party/libASPL/LICENSE
+    # Rust crates linked into the engine (tool/rust_licenses.dart).
+    - native/engine/third_party/rust_licenses.json
