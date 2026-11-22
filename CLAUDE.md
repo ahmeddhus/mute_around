@@ -186,4 +186,9 @@ Windows v1 outputs to VB-CABLE; no kernel driver.
 ### Workflow
 - Work on a branch, never directly on `master`. Small, descriptive commits
   (Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`).
+- After a PR is merged, delete its branch locally and on GitHub. Merge with
+  `gh pr merge <n> --merge --delete-branch` (deletes both and switches to an
+  updated `master`); the repo also has "Automatically delete head branches"
+  on. If a branch was merged another way, run `git fetch --prune` and
+  `git branch -d <branch>`.
 - Platforms: macOS and Windows only — don't add Linux/mobile/web code.
