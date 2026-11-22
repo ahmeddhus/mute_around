@@ -116,6 +116,10 @@ ctest --test-dir build/native-tests --output-on-failure
   `native/macos_hal/scripts/dev_install.sh`.
 - The project's rules are in [`CLAUDE.md`](CLAUDE.md).
 
+## License
+
+Mute Around is released under the [MIT License](LICENSE).
+
 ## Third-party licenses
 
 Third-party components and their licenses are listed in
