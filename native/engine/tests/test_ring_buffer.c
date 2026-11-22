@@ -1,7 +1,7 @@
-#include <pthread.h>
 #include <string.h>
 
 #include "ring_buffer.h"
+#include "rt_thread.h"
 #include "test_util.h"
 
 static void test_empty_and_full(void) {
@@ -48,7 +48,7 @@ static void test_wraparound(void) {
 
 #define TOTAL_SAMPLES 2000000
 
-static void* producer(void* arg) {
+static void producer(void* arg) {
     me_ring* ring = (me_ring*)arg;
     float chunk[97];
     float next = 0.0f;
@@ -61,14 +61,13 @@ static void* producer(void* arg) {
         next += (float)done;
         written += done;
     }
-    return NULL;
 }
 
 static void test_concurrent(void) {
     me_ring ring;
     CHECK_EQ_INT(me_ring_init(&ring, 1024), 0);
-    pthread_t thread;
-    pthread_create(&thread, NULL, producer, &ring);
+    me_thread thread;
+    CHECK_EQ_INT(me_thread_start(&thread, producer, &ring), 0);
 
     float chunk[61];
     size_t read = 0;
@@ -81,7 +80,7 @@ static void test_concurrent(void) {
         }
         read += n;
     }
-    pthread_join(thread, NULL);
+    me_thread_join(thread);
     CHECK(ordered);
     CHECK_EQ_INT(read, TOTAL_SAMPLES);
     me_ring_free(&ring);

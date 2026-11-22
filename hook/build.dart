@@ -67,6 +67,8 @@ void main(List<String> args) async {
           'ntdll',
           'bcrypt',
           'advapi32',
+          // WaitOnAddress / WakeByAddress*, used by Rust std's locks.
+          'synchronization',
         ],
       ),
       _ => throw UnsupportedError(
@@ -87,6 +89,11 @@ void main(List<String> args) async {
       libraries: libraries,
       libraryDirectories: [rustLibDir.toFilePath()],
       std: 'c11',
+      // MSVC ships <stdatomic.h> behind an opt-in flag; without it the
+      // header stops the build with "C atomic support is not enabled".
+      flags: code.targetOS == OS.windows
+          ? ['/experimental:c11atomics']
+          : const [],
     ).run(input: input, output: output);
 
     if (code.targetOS == OS.macOS) {

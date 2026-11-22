@@ -37,6 +37,13 @@ jobs:
         with:
           submodules: recursive
 
+      # libASPL's CMake reads its version with `git describe --tags`, which
+      # fails on checkout's shallow, tagless submodule clone. It's small, so
+      # fetch its full history and tags (DeepFilterNet's stays shallow).
+      - name: Fetch libASPL tags
+        if: runner.os == 'macOS'
+        run: git -C native/macos_hal/third_party/libASPL fetch --unshallow --tags
+
       - uses: dtolnay/rust-toolchain@stable
 
       # DeepFilterNet (libDF + tract) is the slowest part of the build, and it's
