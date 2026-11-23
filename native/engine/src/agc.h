@@ -8,8 +8,14 @@
  * level to ME_AGC_TARGET_DB: down with a 50 ms time constant, up with
  * 400 ms. Within ME_AGC_HANGOVER_MS of speech the gain keeps converging (the
  * gaps between words); in longer silence it is held, never raised, so
- * leftover noise isn't pumped up. Gain changes are ramped across the hop, so they
- * never click.
+ * leftover noise isn't pumped up.
+ *
+ * A boost (positive gain) is applied only while someone is speaking: it is
+ * scaled by a speech presence that follows the per-hop SNR gate, rising in
+ * ME_AGC_PRESENCE_ATTACK_MS and falling in ME_AGC_PRESENCE_RELEASE_MS. The
+ * noise DeepFilterNet leaves in pauses and at word ends is therefore not
+ * lifted with the voice. A cut (negative gain) always applies in full. Gain
+ * changes are ramped across the hop, so they never click.
  *
  * Real-time safe: no allocation, no locks, O(n) per hop.
  */
@@ -35,12 +41,19 @@
 #define ME_AGC_SPEECH_HOPS 5
 /* Hops quieter than this are never treated as speech, whatever the SNR. */
 #define ME_AGC_MIN_SPEECH_DB (-70.0f)
+/* Speech presence time constants: the boost comes in fast enough to keep
+ * word onsets, and fades slowly enough not to chop syllables. */
+#define ME_AGC_PRESENCE_ATTACK_MS 10.0f
+#define ME_AGC_PRESENCE_RELEASE_MS 40.0f
 
 typedef struct {
-    float level_db; /* averaged speech level (before gain) */
-    float gain_db;  /* gain applied at the end of the last hop */
-    int has_level;  /* a speech hop has been seen */
-    int gated_hops; /* consecutive hops above the gate */
+    float level_db;        /* averaged speech level (before gain) */
+    float gain_db;         /* tracked speech gain at the end of the last hop */
+    float applied_db;      /* gain applied at the end of the last hop (boost
+                              scaled by presence) */
+    float presence;        /* smoothed speech presence, 0…1 */
+    int has_level;         /* a speech hop has been seen */
+    int gated_hops;        /* consecutive hops above the gate */
     float since_speech_ms; /* time since the last speech hop */
 } me_agc;
 
@@ -53,7 +66,6 @@ void me_agc_reset(me_agc* agc);
  * ramps back to 0 dB, and the speech level keeps being tracked so turning
  * it back on starts from a good estimate.
  */
-void me_agc_process(me_agc* agc, float* buf, size_t n, float hop_ms, float lsnr_db,
-                    int enabled);
+void me_agc_process(me_agc* agc, float* buf, size_t n, float hop_ms, float lsnr_db, int enabled);
 
 #endif /* ME_AGC_H */
