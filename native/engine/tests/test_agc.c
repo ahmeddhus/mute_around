@@ -5,6 +5,9 @@
  *   AGC has settled, is within ±3 dB of the −18 dBFS target.
  * - loud_laugh.wav: no output sample above −1 dBFS.
  * - silence_noise.wav: noise alone never raises the gain.
+ * - near_far_speech.wav: the noise left in the pauses between syllables is
+ *   not boosted with the far voice: their level with auto gain on stays within
+ *   ±3 dB of auto gain off.
  * - With auto gain off, the gain stays at 0 dB: speech keeps its level after
  *   noise suppression, while auto gain lifts far speech.
  * Unit checks on me_agc / me_limiter cover the gate and the ceiling directly.
@@ -114,6 +117,57 @@ static void test_silence_noise(void) {
     free(out);
 }
 
+/* Median output level, in dBFS, of the hops in [start_s, end_s) whose input
+ * is at most `in_max_db` (pauses: only the fan, no voice). `out` lags `in`
+ * by one hop (DFN's delay). */
+static double pause_median_db(const float* in, const float* out, size_t frames, double start_s,
+                              double end_s, double in_max_db) {
+    static double levels[2000];
+    size_t count = 0;
+    size_t a = (size_t)(start_s * ME_SAMPLE_RATE), b = (size_t)(end_s * ME_SAMPLE_RATE);
+    for (size_t pos = a; pos + 2 * ME_HOP <= b && pos + 2 * ME_HOP <= frames &&
+                         count < sizeof levels / sizeof levels[0];
+         pos += ME_HOP) {
+        double pin = 0.0, pout = 0.0;
+        for (size_t i = 0; i < ME_HOP; i++) {
+            pin += (double)in[pos + i] * in[pos + i];
+            pout += (double)out[pos + ME_HOP + i] * out[pos + ME_HOP + i];
+        }
+        if (10.0 * log10(pin / ME_HOP + 1e-12) > in_max_db) continue;
+        levels[count++] = 10.0 * log10(pout / ME_HOP + 1e-12);
+    }
+    if (count == 0) return -120.0;
+    /* Insertion sort: a few hundred values. */
+    for (size_t i = 1; i < count; i++) {
+        double v = levels[i];
+        size_t j = i;
+        for (; j > 0 && levels[j - 1] > v; j--) levels[j] = levels[j - 1];
+        levels[j] = v;
+    }
+    return levels[count / 2];
+}
+
+static void test_pause_noise_not_boosted(void) {
+    size_t frames = 0;
+    float *in_on = NULL, *in_off = NULL;
+    float* on = run("near_far_speech.wav", 1, &frames, &in_on);
+    float gain = g_last_gain_db;
+    float* off = run("near_far_speech.wav", 0, &frames, &in_off);
+    if (on == NULL || off == NULL) return;
+    /* Room noise alone is −55 dBFS. The run ends in a far segment, where the
+     * AGC boosts the voice by about 12 dB. */
+    double pause_off = pause_median_db(in_off, off, frames, 5.5, 8.0, -50.0);
+    double pause_on = pause_median_db(in_on, on, frames, 5.5, 8.0, -50.0);
+    printf("near_far far pauses: AGC off %.1f, AGC on %.1f dBFS (speech gain %.1f dB)\n", pause_off,
+           pause_on, gain);
+    CHECK(gain > 6.0f); /* the voice really is boosted */
+    CHECK(fabs(pause_on - pause_off) <= TOLERANCE_DB);
+    free(in_on);
+    free(in_off);
+    free(on);
+    free(off);
+}
+
 static void test_agc_off_keeps_level(void) {
     size_t frames = 0;
     float *in_on = NULL, *in_off = NULL;
@@ -165,6 +219,20 @@ static void test_units(void) {
     }
     CHECK(agc.gain_db <= held);
 
+    /* Noise right after speech: the gain is still high, but it isn't applied
+     * once the gate closes, so the noise keeps its level. */
+    me_agc_reset(&agc);
+    for (int i = 0; i < 500; i++) {
+        for (int k = 0; k < ME_HOP; k++) hop[k] = 0.001f * sinf(k * 0.05f);
+        me_agc_process(&agc, hop, ME_HOP, ME_HOP_MS, 20.0f, 1);
+    }
+    for (int i = 0; i < 30; i++) {
+        for (int k = 0; k < ME_HOP; k++) hop[k] = 0.001f * sinf(k * 0.05f);
+        me_agc_process(&agc, hop, ME_HOP, ME_HOP_MS, -10.0f, 1);
+    }
+    CHECK(agc.gain_db > 20.0f);
+    CHECK(fabsf(hop[ME_HOP / 2]) < 0.001f * 1.5f); /* under +3.5 dB */
+
     /* Disabled: back to unity. */
     for (int k = 0; k < ME_HOP; k++) hop[k] = 0.1f;
     me_agc_process(&agc, hop, ME_HOP, ME_HOP_MS, 20.0f, 0);
@@ -193,6 +261,7 @@ int main(void) {
     test_near_far();
     test_loud_laugh();
     test_silence_noise();
+    test_pause_noise_not_boosted();
     test_agc_off_keeps_level();
     TEST_RESULT();
 }
