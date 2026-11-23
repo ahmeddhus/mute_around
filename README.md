@@ -66,6 +66,10 @@ flutter run -d macos        # or: flutter run -d windows
 Already cloned without submodules? Run
 `git submodule update --init --recursive`.
 
+Using [Claude Code](https://claude.com/claude-code)? Run `/setup-macos` or
+`/setup-windows`. Each one checks the prerequisites, suggests what to install
+and then builds and runs the app. The skills are in `.claude/skills/`.
+
 The first build takes a few minutes: the Dart build hook (`hook/build.dart`)
 compiles the engine and DeepFilterNet with cargo. On macOS an Xcode build
 phase also builds the `MuteAround.driver` plug-in into the app bundle.
