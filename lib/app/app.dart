@@ -164,6 +164,7 @@ class _MuteAroundState extends State<MuteAround> {
           ],
           child: MaterialApp.router(
             title: 'Mute Around',
+            debugShowCheckedModeBanner: false,
             theme: ThemeData(
               colorScheme: .fromSeed(seedColor: Colors.deepPurple),
             ),
