@@ -5,6 +5,10 @@ steady volume, in real time, on macOS and Windows. Zoom, Slack, Teams,
 Discord, OBS and any other app hear the cleaned-up voice through a virtual
 microphone.
 
+<p align="center">
+  <img src="docs/screenshot.webp" alt="Mute Around on macOS: processing on, noise reduction set to High, auto gain on, with live input and output meters" width="600">
+</p>
+
 - **Noise suppression** with [DeepFilterNet 3](https://github.com/Rikorose/DeepFilterNet)
   (low-latency model): fans, air conditioning, hum, keyboard clicks, street
   noise. Three strengths: Low, Medium, High.
