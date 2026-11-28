@@ -71,15 +71,15 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # DeepFilterNet (libDF + tract) is the slowest part of the build, and it's
-      # compiled twice: by the Dart build hook and by the CMake test project,
-      # each with its own --target-dir. Cache the cargo registry and both
-      # target dirs (rust-cache keeps dependencies, drops our own crate).
+      # DeepFilterNet (libDF + tract) is the slowest part of the build. The
+      # Dart build hook compiles it, and the CMake test project reuses the
+      # hook's --target-dir (see "Configure native tests"). Cache the cargo
+      # registry and that target dir (rust-cache keeps dependencies, drops
+      # our own crate).
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             native/engine/dfshim -> ../../../.dart_tool/hooks_runner/shared/mute_around/build/cargo
-            native/engine/dfshim -> ../../../build/native-tests/cargo
           cache-on-failure: true
 
       - uses: subosito/flutter-action@v2
@@ -105,10 +105,15 @@ jobs:
       - name: Dart tests
         run: flutter test
 
-      # Unit, WAV-fixture and zero-allocation tests for the C engine.
+      # Unit, WAV-fixture and zero-allocation tests for the C engine. They
+      # link the DeepFilterNet shim that `flutter test` built through the hook
+      # (same cargo invocation, same target dir), so cargo doesn't compile it
+      # again.
       - name: Configure native tests
         if: steps.changes.outputs.native == 'true'
-        run: cmake -S native/engine -B build/native-tests -DCMAKE_BUILD_TYPE=Release
+        run: >
+          cmake -S native/engine -B build/native-tests -DCMAKE_BUILD_TYPE=Release
+          -DMUTE_DF_CARGO_TARGET_DIR:PATH=.dart_tool/hooks_runner/shared/mute_around/build/cargo
 
       - name: Build native tests
         if: steps.changes.outputs.native == 'true'

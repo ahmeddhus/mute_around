@@ -17,11 +17,56 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # --- libDF shim (Rust) ---------------------------------------------------
 find_program(CARGO cargo HINTS "$ENV{HOME}/.cargo/bin" /opt/homebrew/opt/rustup/bin REQUIRED)
 set(MDF_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dfshim")
-set(MDF_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/cargo")
-if(WIN32)
-  set(MDF_LIB "${MDF_TARGET_DIR}/release/mute_df.lib")
+# The cargo invocation below mirrors hook/build.dart's exactly (same
+# --target triple, --release, --locked and MACOSX_DEPLOYMENT_TARGET), so
+# both can share a --target-dir and DeepFilterNet (libDF + tract) compiles
+# once. CI points MUTE_DF_CARGO_TARGET_DIR at the hook's target dir,
+# .dart_tool/hooks_runner/shared/mute_around/build/cargo, after
+# `flutter test` has built it. If the two invocations ever differ, cargo
+# rebuilds and overwrites the other's output on every alternate build, so
+# change both together. The hooks runner also drops most environment
+# variables before running the hook (RUSTFLAGS, and CC/CFLAGS/AR, which
+# tract-linalg's build script tracks), so don't set those for this build.
+# A relative path is taken from the repository root.
+set(MUTE_DF_CARGO_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/cargo" CACHE PATH
+  "cargo --target-dir for the DeepFilterNet shim (relative: from the repo root)")
+file(TO_CMAKE_PATH "${MUTE_DF_CARGO_TARGET_DIR}" MDF_TARGET_DIR)
+cmake_path(ABSOLUTE_PATH MDF_TARGET_DIR
+  BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.." NORMALIZE)
+
+# Same triple as _rustTarget() in hook/build.dart.
+if(APPLE)
+  if(CMAKE_OSX_ARCHITECTURES)
+    set(MDF_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+  else()
+    set(MDF_ARCH "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+  endif()
+  set(MDF_OS apple-darwin)
+elseif(WIN32)
+  if(CMAKE_GENERATOR_PLATFORM)
+    set(MDF_ARCH "${CMAKE_GENERATOR_PLATFORM}")
+  else()
+    set(MDF_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  set(MDF_OS pc-windows-msvc)
 else()
-  set(MDF_LIB "${MDF_TARGET_DIR}/release/libmute_df.a")
+  message(FATAL_ERROR "Mute Around supports macOS and Windows only")
+endif()
+string(TOLOWER "${MDF_ARCH}" MDF_ARCH)
+if(MDF_ARCH MATCHES "^(arm64|aarch64)$")
+  set(MDF_ARCH aarch64)
+elseif(MDF_ARCH MATCHES "^(x86_64|amd64|x64)$")
+  set(MDF_ARCH x86_64)
+else()
+  message(FATAL_ERROR "No Rust target for architecture '${MDF_ARCH}'")
+endif()
+set(MUTE_DF_RUST_TARGET "${MDF_ARCH}-${MDF_OS}" CACHE STRING
+  "cargo --target triple for the DeepFilterNet shim")
+
+if(WIN32)
+  set(MDF_LIB "${MDF_TARGET_DIR}/${MUTE_DF_RUST_TARGET}/release/mute_df.lib")
+else()
+  set(MDF_LIB "${MDF_TARGET_DIR}/${MUTE_DF_RUST_TARGET}/release/libmute_df.a")
 endif()
 # cargo needs rustc next to it on PATH. Homebrew's rustup keeps both in a
 # folder that isn't on PATH, so prepend it there. On Windows, rustup puts
@@ -30,13 +75,18 @@ endif()
 if(WIN32)
   set(CARGO_CMD "${CARGO}")
 else()
+  # The hook passes "<major>.0" of the app's deployment target
+  # (macos/Runner.xcodeproj: MACOSX_DEPLOYMENT_TARGET = 13.0).
+  set(MUTE_DF_MACOSX_DEPLOYMENT_TARGET "13.0" CACHE STRING
+    "MACOSX_DEPLOYMENT_TARGET for the DeepFilterNet shim; must match the hook's")
   get_filename_component(CARGO_DIR "${CARGO}" DIRECTORY)
-  set(CARGO_CMD "${CMAKE_COMMAND}" -E env "PATH=${CARGO_DIR}:$ENV{PATH}" "${CARGO}")
+  set(CARGO_CMD "${CMAKE_COMMAND}" -E env "PATH=${CARGO_DIR}:$ENV{PATH}"
+    "MACOSX_DEPLOYMENT_TARGET=${MUTE_DF_MACOSX_DEPLOYMENT_TARGET}" "${CARGO}")
 endif()
 add_custom_command(
   OUTPUT "${MDF_LIB}"
   COMMAND ${CARGO_CMD} build --release --locked --manifest-path "${MDF_DIR}/Cargo.toml"
-          --target-dir "${MDF_TARGET_DIR}"
+          --target "${MUTE_DF_RUST_TARGET}" --target-dir "${MDF_TARGET_DIR}"
   DEPENDS "${MDF_DIR}/Cargo.toml" "${MDF_DIR}/Cargo.lock" "${MDF_DIR}/src/lib.rs"
           "${MDF_DIR}/src/rt_alloc.rs"
   COMMENT "Building the DeepFilterNet shim with cargo"

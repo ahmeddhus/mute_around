@@ -139,6 +139,8 @@ Future<void> _cargoBuild({
   required String rustTarget,
   String? macosDeploymentTarget,
 }) async {
+  // native/engine/CMakeLists.txt runs this exact cargo command (arguments
+  // and environment) so CI can share this target dir; change both together.
   final cargo = _findCargo();
   final env = <String, String>{
     // cargo needs rustc from the same toolchain folder on PATH.
