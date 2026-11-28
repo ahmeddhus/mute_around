@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: read
+  # Lets the native-changes step list a PR's files.
+  pull-requests: read
 
 # A new push to the same PR cancels the run that's still going.
 concurrency:
@@ -37,11 +39,34 @@ jobs:
         with:
           submodules: recursive
 
+      # The native tests and the full app build only matter when a PR touches
+      # the engine, the build hook, the runner projects or dependencies. The
+      # job still runs (and reports) either way, so required checks never sit
+      # pending the way a workflow-level `paths:` filter would leave them.
+      # Pushes to master and manual runs always do everything.
+      - name: Detect native changes
+        id: changes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          native=true
+          if [ "$EVENT" = pull_request ]; then
+            files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+            pattern='^(native/|hook/|macos/|windows/|lib/core/native/|\.github/workflows/|\.gitmodules$|pubspec\.(yaml|lock)$)'
+            grep -qE "$pattern" <<<"$files" || native=false
+          fi
+          echo "native=$native" >> "$GITHUB_OUTPUT"
+          echo "Native steps: $native"
+
       # libASPL's CMake reads its version with `git describe --tags`, which
       # fails on checkout's shallow, tagless submodule clone. It's small, so
       # fetch its full history and tags (DeepFilterNet's stays shallow).
       - name: Fetch libASPL tags
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.changes.outputs.native == 'true'
         run: git -C native/macos_hal/third_party/libASPL fetch --unshallow --tags
 
       - uses: dtolnay/rust-toolchain@stable
@@ -82,22 +107,25 @@ jobs:
 
       # Unit, WAV-fixture and zero-allocation tests for the C engine.
       - name: Configure native tests
+        if: steps.changes.outputs.native == 'true'
         run: cmake -S native/engine -B build/native-tests -DCMAKE_BUILD_TYPE=Release
 
       - name: Build native tests
+        if: steps.changes.outputs.native == 'true'
         run: cmake --build build/native-tests --config Release
 
       - name: Run native tests
+        if: steps.changes.outputs.native == 'true'
         run: ctest --test-dir build/native-tests --build-config Release --output-on-failure
 
       # Catches breakage in the build hook, the HAL plug-in (macOS) and the
       # runner projects that the tests above don't compile.
       - name: Build app (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.changes.outputs.native == 'true'
         run: flutter build macos --debug
 
       - name: Build app (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.changes.outputs.native == 'true'
         run: flutter build windows --debug
 
   licenses:
